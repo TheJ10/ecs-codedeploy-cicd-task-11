@@ -82,7 +82,7 @@ resource "aws_ecs_service" "jaspal_task11_service" {
   name            = "jaspal-task11-strapi-service"
   cluster         = aws_ecs_cluster.jaspal_task11_cluster.id
   task_definition = aws_ecs_task_definition.jaspal_task11_task.arn
-  desired_count   = 0  
+  desired_count   = 1 
   capacity_provider_strategy {
     capacity_provider = "FARGATE_SPOT"
     weight            = 1
@@ -106,7 +106,9 @@ resource "aws_ecs_service" "jaspal_task11_service" {
 
   lifecycle {
   ignore_changes = [
-    task_definition
+    task_definition,
+    network_configuration,
+    load_balancer
   ]
 }
 }
