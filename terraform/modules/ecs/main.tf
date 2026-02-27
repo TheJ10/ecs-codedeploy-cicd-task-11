@@ -84,7 +84,7 @@ resource "aws_ecs_service" "jaspal_task11_service" {
   task_definition = aws_ecs_task_definition.jaspal_task11_task.arn
   desired_count   = 1 
   capacity_provider_strategy {
-    capacity_provider = "FARGATE_SPOT"
+    capacity_provider = "FARGATE"
     weight            = 1
   }
 

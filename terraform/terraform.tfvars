@@ -1,4 +1,4 @@
-image_tag         = "initial"
+image_tag         = "64938c0"
 execution_role_arn = "arn:aws:iam::811738710312:role/ecs_fargate_taskRole"
 
 db_name     = "jaspal_task11_strapi"
