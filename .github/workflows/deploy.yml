@@ -1,0 +1,111 @@
+name: CD - Deploy to ECS via CodeDeploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Download Current Task Definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition jaspal-task11-strapi-task \
+            --query taskDefinition > task-def.json
+
+      - name: Register New Task Definition Revision
+        run: |
+          NEW_IMAGE="811738710312.dkr.ecr.us-east-1.amazonaws.com/jaspal-task11-strapi:${{ github.event.inputs.image_tag }}"
+
+          jq --arg IMAGE "$NEW_IMAGE" '
+            .containerDefinitions[0].image = $IMAGE
+            | del(.taskDefinitionArn)
+            | del(.revision)
+            | del(.status)
+            | del(.requiresAttributes)
+            | del(.compatibilities)
+            | del(.registeredAt)
+            | del(.registeredBy)
+          ' task-def.json > new-task-def.json
+
+          aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json
+
+      - name: Get Latest Task Definition ARN
+        run: |
+          TASK_DEF_ARN=$(aws ecs list-task-definitions \
+            --family-prefix jaspal-task11-strapi-task \
+            --sort DESC \
+            --max-items 1 \
+            --query "taskDefinitionArns[0]" \
+            --output text)
+
+          echo "Using Task Definition: $TASK_DEF_ARN"
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+
+      - name: Create AppSpec File
+        run: |
+          cat > appspec.json <<EOF
+          {
+            "version": 1,
+            "Resources": [
+              {
+                "TargetService": {
+                  "Type": "AWS::ECS::Service",
+                  "Properties": {
+                    "TaskDefinition": "$TASK_DEF_ARN",
+                    "LoadBalancerInfo": {
+                      "ContainerName": "jaspal-task11-strapi-container",
+                      "ContainerPort": 1337
+                    }
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+
+      - name: Create Revision File
+        run: |
+          jq -n \
+            --arg content "$(cat appspec.json)" \
+            '{
+              revisionType: "AppSpecContent",
+              appSpecContent: {
+                content: $content
+              }
+            }' > revision.json
+
+      - name: Trigger CodeDeploy Deployment
+        run: |
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name jaspal-task11-codedeploy-app \
+            --deployment-group-name jaspal-task11-dg \
+            --revision file://revision.json \
+            --query deploymentId \
+            --output text)
+
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
+          echo "Deployment ID: $DEPLOYMENT_ID"
+
+      - name: Wait for Deployment Success
+        run: |
+          aws deploy wait deployment-successful \
+            --deployment-id $DEPLOYMENT_ID
+
+          echo "Deployment Successful!"

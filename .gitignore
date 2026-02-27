@@ -1,0 +1,10 @@
+# Node
+node_modules/
+
+# Environment files
+.env
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate*
+terraform/.terraform.lock.hcl
