@@ -48,11 +48,9 @@ jobs:
 
       - name: Get Latest Task Definition ARN
         run: |
-          TASK_DEF_ARN=$(aws ecs list-task-definitions \
-            --family-prefix jaspal-task11-strapi-task \
-            --sort DESC \
-            --max-items 1 \
-            --query "taskDefinitionArns[0]" \
+          TASK_DEF_ARN=$(aws ecs describe-task-definition \
+            --task-definition jaspal-task11-strapi-task \
+            --query "taskDefinition.taskDefinitionArn" \
             --output text)
 
           echo "Using Task Definition: $TASK_DEF_ARN"
